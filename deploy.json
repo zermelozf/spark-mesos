@@ -1,0 +1,20 @@
+curl -X POST -H "Content-type: application/json" node1:8080/v2/apps -d '{
+    "id": "mongod",
+    "cmd": "mongod --port 27017",
+    "instances": 4,
+    "constraints": [["hostname", "GROUP_BY"]]
+  }'
+
+  curl -X POST -H "Content-type: application/json" node1:8080/v2/apps -d '{
+    "id": "mongod-configserver",
+    "cmd": "mongod --configsvr --dbpath /data/configdb --port 27019",
+    "instances": 3,
+    "constraints": [["hostname", "GROUP_BY"], ["hostname", "LIKE", "node[1-3]"]]
+  }'
+
+   curl -X POST -H "Content-type: application/json" node1:8080/v2/apps -d '{
+    "id": "mongos",
+    "cmd": "mongos --configdb node1:27019,node2:27019,node3:27019 --port 27018",
+    "instances": 1,
+    "constraints": []
+  }'

@@ -1,0 +1,81 @@
+- hosts: master
+  remote_user: vagrant
+  sudo: yes
+  tasks:
+      - name: ensure utf8 is properly set in teminal
+        shell: locale-gen UTF-8
+      - name: update the hosts file
+        template: src=./templates/hosts.j2 dest=/etc/hosts
+      - name: copy ansible roles to master
+        shell: cp -R /vagrant/ansible /home/vagrant/ansible
+
+      # install ansible
+      - name: install ansible dependencies
+        apt: pkg=software-properties-common state=present
+      - name: add ansible
+        apt_repository: repo='ppa:ansible/ansible' update_cache=yes
+      - name: install ansible
+        apt: pkg=ansible state=present update_cache=yes
+
+      # Install mesos, zookeeper, marathon and docker
+      - name: add mesosphere repo key
+        apt_key: keyserver=keyserver.ubuntu.com id=E56151BF state=present
+      - name: install the mesosphere apt repo
+        apt_repository: repo='deb http://repos.mesosphere.com/ubuntu trusty main' state=present update_cache=yes
+      - name: install mesos
+        apt: pkg=mesos state=present update_cache=yes
+      - name: install marathon
+        apt: pkg=marathon state=present update_cache=yes
+      - name: install docker
+        shell: wget -qO- https://get.docker.com/ | sh executable=/bin/bash
+      - name: set the zookeeper master
+        shell: sed -i -e 's/localhost/192.168.33.10/g' /etc/mesos/zk
+      - name: configure zookeeper ID
+        shell: echo 1 > /etc/zookeeper/conf/myid
+      - name: enable docker containers 
+        shell: "echo 'docker,mesos' | sudo tee /etc/mesos-slave/containerizers"
+
+      # Ensure the services are started on boot
+      - name: restart zookeeper and enable it
+        service: name=zookeeper state=restarted enabled=yes
+      - name: enable mesos-master
+        service: name=mesos-master state=started enabled=yes
+      - name: enable mesos-slave
+        service: name=mesos-slave state=started enabled=yes
+      - name: start marathon
+        service: name=marathon state=started enabled=yes
+      - name: start docker
+        service: name=docker state=started enabled=yes
+
+
+- hosts: nodes
+  remote_user: vagrant
+  sudo: yes
+  tasks:
+      - name: ensure utf8 is properly set in teminal
+        shell: locale-gen UTF-8
+      - name: update the hosts file
+        template: src=./templates/hosts.j2 dest=/etc/hosts
+
+      # Install mesos and docker
+      - name: add mesosphere repo key
+        apt_key: keyserver=keyserver.ubuntu.com id=E56151BF state=present
+      - name: install the mesosphere apt repo
+        apt_repository: repo='deb http://repos.mesosphere.com/ubuntu trusty main' state=present update_cache=yes
+      - name: install mesosphere
+        apt: pkg=mesos state=present update_cache=yes
+      - name: install docker
+        shell: wget -qO- https://get.docker.com/ | sh executable=/bin/bash
+      - name: set the zookeeper master
+        shell: sed -i -e 's/localhost/192.168.33.10/g' /etc/mesos/zk
+      - name: enable docker containers 
+        shell: "echo 'docker,mesos' | sudo tee /etc/mesos-slave/containerizers"
+
+      # Ensure the services are started
+      - name: make sure mesos-slave is running
+        service: name=mesos-slave state=started enabled=yes
+      - name: enable docker
+        service: name=docker state=started enabled=yes
+
+
+
